@@ -33,6 +33,16 @@ describe('Todos', () => {
     )
   });
 
+  it('should not be able to list todos of a non existing user', async () => {
+    return request(app)
+      .get('/todos')
+      .set('username', 'invalid-user-name')
+      .expect(404)
+      .then(({ body }) => {
+        expect(body).toHaveProperty('error')
+      })
+  })
+
   it('should be able to create a new todo', async () => {
     const userResponse = await request(app)
       .post('/users')
@@ -94,6 +104,40 @@ describe('Todos', () => {
     });
   });
 
+  it('should changes a users todo list after update a todo', async () => {
+    const username = 'user11'
+    await request(app)
+      .post('/users')
+      .send({
+        name: 'John Doe',
+        username
+      });
+
+    const todoDate = new Date();
+
+    const { body: { id } } = await request(app)
+      .post('/todos')
+      .send({
+        title: 'test todo',
+        deadline: todoDate
+      })
+      .set('username', username);
+
+    const { body: expected } = await request(app)
+      .put(`/todos/${id}`)
+      .send({
+        title: 'update title',
+        deadline: todoDate
+      })
+      .set('username', username);
+
+    const { body } = await request(app)
+      .get('/todos')
+      .set('username', username)
+
+    expect(body).toContainEqual(expected)
+  })
+
   it('should not be able to update a non existing todo', async () => {
     const userResponse = await request(app)
       .post('/users')
@@ -144,6 +188,34 @@ describe('Todos', () => {
     });
   });
 
+  it('should changes a users todo list after mark it as done', async () => {
+    const username = 'user12'
+    await request(app)
+      .post('/users')
+      .send({
+        name: 'John Doe',
+        username
+      });
+
+    const { body: { id } } = await request(app)
+      .post('/todos')
+      .send({
+        title: 'test todo',
+        deadline: new Date(),
+      })
+      .set('username', username);
+
+    const { body: expected } = await request(app)
+      .patch(`/todos/${id}/done`)
+      .set('username', username);
+
+    const { body } = await request(app)
+      .get('/todos')
+      .set('username', username)
+
+    expect(body).toContainEqual(expected)
+  });
+
   it('should not be able to mark a non existing todo as done', async () => {
     const userResponse = await request(app)
       .post('/users')
@@ -188,6 +260,45 @@ describe('Todos', () => {
       .set('username', userResponse.body.username);
 
     expect(listResponse.body).toEqual([]);
+  });
+
+  it('should delete only the selected todo', async () => {
+    const username = 'user13'
+    const userResponse = await request(app)
+      .post('/users')
+      .send({
+        name: 'John Doe',
+        username
+      });
+
+    const todoDate = new Date();
+
+    const { body: { id } } = await request(app)
+      .post('/todos')
+      .send({
+        title: 'test todo',
+        deadline: todoDate
+      })
+      .set('username', username);
+
+    const { body: todo2 } = await request(app)
+      .post('/todos')
+      .send({
+        title: 'test todo',
+        deadline: todoDate
+      })
+      .set('username', username);
+
+    await request(app)
+      .delete(`/todos/${id}`)
+      .set('username', username)
+      .expect(204);
+
+    const { body } = await request(app)
+      .get('/todos')
+      .set('username', username);
+
+    expect(body).toEqual([todo2]);
   });
 
   it('should not be able to delete a non existing todo', async () => {
